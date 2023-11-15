@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">MQTTGasAlert</string>
+    <string name="adressebroker"> <b> Adresse du Broker</b></string>
+    <string name="connectionName"> <b> Connection Name</b></string>
+    <string name="port"> <b> Port</b></string>
+    <string name="topic"> <b> Topic</b></string>
+    <string name="seuil"> <b> Seuil</b></string>
+    <string name="save"> <b> Save</b></string>
+</resources>

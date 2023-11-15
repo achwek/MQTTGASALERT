@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_marginStart="12dp"
+    android:layout_marginEnd="12dp"
+    android:layout_marginVertical="10dp"
+    android:layout_marginHorizontal="10dp"
+    app:cardCornerRadius="20dp"
+    app:cardElevation="8dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/listImage"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_alignParentStart="true"
+            android:layout_alignParentTop="true"
+            android:layout_marginStart="7dp"
+            android:layout_marginTop="28dp"
+            android:layout_marginBottom="10dp"
+            android:scaleType="centerCrop" />
+
+        <TextView
+            android:id="@+id/connectionName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toEndOf="@id/listImage"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="10dp"
+            android:textSize="20sp"
+            android:textColor="@color/black" />
+
+        <TextView
+            android:id="@+id/tvTopicName"
+            android:layout_width="120dp"
+            android:layout_height="30dp"
+            android:layout_below="@+id/connectionName"
+            android:layout_alignParentStart="true"
+            android:layout_marginStart="80dp"
+            android:layout_marginTop="10dp"
+            android:text="Topic"
+            android:textColor="@color/black"
+            android:textSize="20sp" />
+
+        <TextView
+            android:id="@+id/tvSeuil"
+            android:layout_width="80dp"
+            android:layout_height="30dp"
+            android:layout_below="@+id/tvTopicName"
+            android:layout_alignParentStart="true"
+            android:layout_marginStart="80dp"
+            android:layout_marginTop="10dp"
+            android:text="Seuil"
+            android:textColor="@color/black"
+            android:textSize="16sp" />
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/deleteIcon"
+            android:layout_width="46dp"
+            android:layout_height="34dp"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentEnd="true"
+            android:layout_marginTop="51dp"
+            android:layout_marginEnd="46dp"
+            android:layout_marginBottom="10dp"
+            android:scaleType="centerCrop"
+        android:src="@drawable/baseline_delete_24"
+        android:background="?attr/selectableItemBackgroundBorderless" />
+
+    </RelativeLayout>
+
+</androidx.cardview.widget.CardView>
