@@ -29,15 +29,15 @@ public class ListSubscriberActivity extends AppCompatActivity {
         // Étape 2 : Récupérer les données des abonnés depuis la base de données
         ArrayList<Subscriber> subscribers = dbHelper.getAllSubscribers();
 
-        // Étape 3 : Créer une instance de ListAdapterSubscribers et la définir comme adaptateur pour RecyclerView
+        // Initialiser l'interface onDeleteClickListener
         onDeleteClickListener = new ListAdapterSubscribers.OnDeleteClickListener() {
             @Override
             public void onDeleteClick(int position) {
                 // Assurez-vous que la position est valide avant d'accéder à la liste
                 if (position >= 0 && position < subscribers.size()) {
                     // Supprimez l'élément de la base de données
-                    String subscriberId = subscribers.get(position).getSubscriberId();
-                    dbHelper.deleteSubscriber(subscriberId);
+                    dbHelper.deleteSubscriber(subscribers.get(position).getSubscriberId());
+                    Log.e("ListSubscriberActivity", "Position invalide : " + position);
 
                     // Supprimez l'élément de la liste
                     subscribers.remove(position);
@@ -49,12 +49,14 @@ public class ListSubscriberActivity extends AppCompatActivity {
             }
         };
 
+        // Étape 3 : Créer une instance de ListAdapterSubscribers et la définir comme adaptateur pour RecyclerView
         adapter = new ListAdapterSubscribers(this, subscribers, onDeleteClickListener);
 
         RecyclerView recyclerView = findViewById(R.id.recyclerViewSubscribers);
         recyclerView.setAdapter(adapter);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
+        // Barre de navigation inférieure
         // Barre de navigation inférieure
         BottomNavigationView bottomNavigationView = findViewById(R.id.bottomNavigation);
         bottomNavigationView.setSelectedItemId(R.id.bottom_listSubscribers);
@@ -82,5 +84,7 @@ public class ListSubscriberActivity extends AppCompatActivity {
 
             return false;
         });
+
+
     }
 }

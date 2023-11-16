@@ -14,23 +14,15 @@
         android:layout_width="match_parent"
         android:layout_height="300dp" />
 
-    <Button
-        android:id="@+id/startButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Start"
-        android:onClick="startButtonClick"
-        android:layout_below="@id/mChart" />
 
-    <TextView
-        android:id="@+id/gasValueTextView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/startButton"
-        android:layout_marginTop="16dp"
-        android:text="Gaz Value: "
-        android:textSize="18sp"
-        android:textStyle="bold" />
+    <ListView
+        android:id="@+id/listViewGasValues"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/mChart"
+        android:divider="@android:color/darker_gray"
+        android:dividerHeight="1dp"
+        android:padding="16dp"
+        android:visibility="visible" />
 
 </RelativeLayout>

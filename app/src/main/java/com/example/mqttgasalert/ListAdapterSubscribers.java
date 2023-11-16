@@ -1,6 +1,7 @@
 package com.example.mqttgasalert;
 
 import android.content.Context;
+import android.content.Intent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -49,6 +50,27 @@ public class ListAdapterSubscribers extends RecyclerView.Adapter<ListAdapterSubs
                 if (onDeleteClickListener != null) {
                     onDeleteClickListener.onDeleteClick(position);
                 }
+            }
+        });
+
+        // Set click listener for the list item itself
+        holder.itemView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Get the selected subscriber
+                Subscriber selectedSubscriber = subscriberList.get(position);
+
+                // Create an intent to start SubscriberActivity
+                Intent intent = new Intent(context, SubscriberActivity.class);
+
+                // Pass data to SubscriberActivity
+                intent.putExtra("adressB", selectedSubscriber.getAdresseBroker());
+                intent.putExtra("port", String.valueOf(selectedSubscriber.getPort()));
+                intent.putExtra("topic", selectedSubscriber.getTopic());
+                intent.putExtra("seuil", String.valueOf(selectedSubscriber.getSeuil()));
+
+                // Start SubscriberActivity
+                context.startActivity(intent);
             }
         });
     }

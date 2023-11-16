@@ -1,5 +1,7 @@
 package com.example.mqttgasalert;
 
+
+
 import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -13,7 +15,9 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Vibrator;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.Nullable;
@@ -21,7 +25,6 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import org.eclipse.paho.client.mqttv3.*;
 import android.content.Intent;
-// Add these imports if they are not already present
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineDataSet;
@@ -29,25 +32,26 @@ import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import com.github.mikephil.charting.components.YAxis;
 import android.graphics.Color;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-
-
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
 
 public class SubscriberActivity extends AppCompatActivity {
-    //chart declaration
     private LineChart mChart;
     private LineDataSet dataSet;
-    //sos declaration
     private boolean isSOSActive = false;
     private CameraManager cameraManager;
     private String cameraId;
     private Handler sosHandler = new Handler(Looper.getMainLooper());
     private int sosIndex = 0;
-    private static final long SOS_DELAY = 100; // Durée entre les clignotements en millisecondes
+    private static final long SOS_DELAY = 100;
 
-    //declaration de parametre de broker port topic et seuil
     private String brokerAddress, brokerPort, gasTopic, threshold;
-    private TextView gasValueTextView;
+    private ListView gasValuesListView;
+    private List<String> gasValuesList;
+    private ArrayAdapter<String> gasValuesAdapter;
 
     private MqttClient mqttClient;
     private double thresholdValue = 0.0;
@@ -56,45 +60,28 @@ public class SubscriberActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_subscriber);
-// Récupérer l'intention qui a démarré cette activité
+
         Intent intent = getIntent();
 
         brokerAddress = intent.getStringExtra("adressB");
         brokerPort = intent.getStringExtra("port");
-        gasTopic= intent.getStringExtra("topic");
+        gasTopic = intent.getStringExtra("topic");
         threshold = intent.getStringExtra("seuil");
-        gasValueTextView = findViewById(R.id.gasValueTextView);
+        gasValuesListView = findViewById(R.id.listViewGasValues);
+        gasValuesList = new ArrayList<>();
+        gasValuesAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, gasValuesList);
+        gasValuesListView.setAdapter(gasValuesAdapter);
 
-        Button startButton = findViewById(R.id.startButton);
-        startButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                // Set the threshold value
-                String thresholdStr = threshold.toString();
-                if (!thresholdStr.isEmpty()) {
-                    thresholdValue = Double.parseDouble(thresholdStr);
-                }
-
-                // Connect to MQTT broker
-                startButtonClick(view);
-            }
-        });
-        //*******chart oncreate
         mChart = findViewById(R.id.mChart);
-
-        // Set up the line chart
         dataSet = new LineDataSet(new ArrayList<>(), "Gas Values");
         LineData lineData = new LineData(dataSet);
         mChart.setData(lineData);
 
-
-        // Vérifiez si le dispositif a une fonction de lampe de poche
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)) {
             Toast.makeText(this, "La lampe de poche n'est pas disponible sur ce dispositif", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // Initialisez le gestionnaire de caméra
         cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
 
         try {
@@ -104,10 +91,28 @@ public class SubscriberActivity extends AppCompatActivity {
             return;
         }
 
+        String thresholdStr = threshold.toString();
+        if (!thresholdStr.isEmpty()) {
+            thresholdValue = Double.parseDouble(thresholdStr);
+        }
+        try {
+
+            connectToMQTTBroker();
+
+        } catch (MqttException e) {
+            e.printStackTrace();
+            Toast.makeText(SubscriberActivity.this, "Failed to connect to the MQTT broker", Toast.LENGTH_SHORT).show();
+        }
+
+
+            loadRecentGasValues();
+
+
+
 
     }
 
-    private void connectToMQTTBroker() {
+    private void connectToMQTTBroker() throws MqttException {
         String brokerAd = brokerAddress.toString();
         String brokerP = brokerPort.toString();
         final String broker = "tcp://" + brokerAd + ":" + brokerP;
@@ -120,6 +125,8 @@ public class SubscriberActivity extends AppCompatActivity {
             options.setCleanSession(true);
 
             mqttClient.connect(options);
+            // Chargez les 10 dernières valeurs de la base de données et mettez à jour le graphique
+            loadRecentGasValues();
 
             mqttClient.setCallback(new MqttCallback() {
                 @Override
@@ -129,12 +136,10 @@ public class SubscriberActivity extends AppCompatActivity {
 
                 @Override
                 public void messageArrived(String topic, MqttMessage message) {
-                    // Handle incoming messages
                     if (topic.equals(gasTopic.toString())) {
                         String gasValueStr = new String(message.getPayload());
                         displayGasValue(gasValueStr);
 
-                        // Check if the gas value exceeds the threshold
                         double gasValue = Double.parseDouble(gasValueStr);
                         if (gasValue > thresholdValue) {
                             handleGasExceedingThreshold(gasValue);
@@ -152,49 +157,30 @@ public class SubscriberActivity extends AppCompatActivity {
 
         } catch (MqttException e) {
             e.printStackTrace();
+            throw e; // throw the exception to be caught by the calling method
         }
     }
 
-    /*private void displayGasValue(final String value) {
-        new Handler(Looper.getMainLooper()).post(new Runnable() {
-            @Override
-            public void run() {
-                gasValueTextView.setText(value);
-                Toast.makeText(getApplicationContext(), value, Toast.LENGTH_LONG).show();
-            }
-        });
-    }*/
-
-    private void handleGasExceedingThreshold(final double gasValue) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                if (gasValue > thresholdValue) {
-                    // Vibrate the device
-                    vibrateDevice();
-                    toggleSOS();
-
-                }
-            }
-        });
-    }
-
-
-
-    //begin code chart
     private void displayGasValue(final String value) {
         new Handler(Looper.getMainLooper()).post(new Runnable() {
             @Override
             public void run() {
-                // Update the TextView
-                gasValueTextView.setText(value);
-
-                // Update the LineChart
                 updateChart(Double.parseDouble(value));
+                updateGasValuesList(value);
             }
         });
     }
+    private void updateGasValuesList(String value) {
+        // Format the date and time
+        String formattedDateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
 
+        // Add the gas value and date to the list
+        String gasValueWithDate = value + " (" + formattedDateTime + ")";
+        gasValuesList.add(0, gasValueWithDate);  // Ajoutez le nouvel élément en haut de la liste
+
+        // Notify the adapter that the data set has changed
+        gasValuesAdapter.notifyDataSetChanged();
+    }
 
     private void updateChart(double gasValue) {
         LineData data = mChart.getData();
@@ -209,15 +195,14 @@ public class SubscriberActivity extends AppCompatActivity {
 
             data.addEntry(new Entry(set.getEntryCount(), (float) gasValue), 0);
 
-            // Notify chart data has changed
             mChart.notifyDataSetChanged();
             mChart.invalidate();
         }
     }
 
-
     private LineDataSet createSet() {
-        LineDataSet set = new LineDataSet(null, "Gas Values");
+        LineDataSet set = new LineDataSet(new ArrayList<>(), "Gas Values");
+
         set.setAxisDependency(YAxis.AxisDependency.LEFT);
         set.setColor(Color.RED);
         set.setCircleColor(Color.RED);
@@ -225,83 +210,40 @@ public class SubscriberActivity extends AppCompatActivity {
         set.setCircleRadius(3f);
         set.setValueTextSize(10f);
         set.setDrawValues(false);
+
         return set;
     }
 
 
+    private void handleGasExceedingThreshold(final double gasValue) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (gasValue > thresholdValue) {
+                    vibrateDevice();
+                    toggleSOS();
+                }
+            }
+        });
+    }
 
-    //*******fincode chart
     private void vibrateDevice() {
-        // Get the Vibrator service
         Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
 
-        // Check if the device supports vibration
         if (vibrator != null && vibrator.hasVibrator()) {
-            // Vibrate for 5000 milliseconds (5 seconds)
             vibrator.vibrate(5000);
         }
     }
-
-    private void showGasExceedingThresholdNotification(double gasValue) {// Create a notification channel if the device is running Android Oreo or higher
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            String channelId = "GasNotificationChannel";
-            CharSequence channelName = "Gas Notifications";
-            int importance = NotificationManager.IMPORTANCE_DEFAULT;
-            NotificationChannel channel = new NotificationChannel(channelId, channelName, importance);
-            NotificationManager notificationManager = getSystemService(NotificationManager.class);
-            notificationManager.createNotificationChannel(channel);
-        }
-
-        // Create the notification
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "GasNotificationChannel")
-                .setSmallIcon(android.R.drawable.ic_dialog_alert)
-                .setContentTitle("Gas Alert!")
-                .setContentText("Gas value exceeds threshold: " + gasValue)
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT);
-
-// Show the notification
-        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
-        notificationManager.notify(1, builder.build());
-    }
-
-    public void startButtonClick(View view) {
-        // Set the threshold value
-        String thresholdStr = threshold.toString();
-        if (!thresholdStr.isEmpty()) {
-            thresholdValue = Double.parseDouble(thresholdStr);
-        }
-
-        // Connect to MQTT broker
-        connectToMQTTBroker();
-
-        // Optionally, you can add additional logic here if needed
-        // For example, you might want to update the UI or perform other actions.
-    }
-
-
-//alert sos
 
     private void toggleSOS() {
         isSOSActive = true;
         startSOS();
     }
 
- /*  private void toggleSOS() {
-
-        isSOSActive = !isSOSActive;
-
-        if (isSOSActive) {
-            startSOS();
-        } else {
-            stopSOS();
-        }
-    }*/
-
     private void startSOS() {
         sosIndex = 0;
         sosHandler.post(sosRunnable);
     }
-
 
     private void stopSOS() {
         sosHandler.removeCallbacks(sosRunnable);
@@ -323,16 +265,14 @@ public class SubscriberActivity extends AppCompatActivity {
             e.printStackTrace();
         }
     }
+
     private Runnable sosRunnable = new Runnable() {
         @Override
         public void run() {
-
-            if (sosIndex < 50) { // Répétez pour former le motif SOS
+            if (sosIndex < 50) {
                 if (sosIndex % 2 == 0) {
-                    // Tournez la torche
                     turnOnFlashlight();
                 } else {
-                    // Éteignez la torche
                     turnOffFlashlight();
                 }
 
@@ -341,7 +281,6 @@ public class SubscriberActivity extends AppCompatActivity {
             } else {
                 isSOSActive = false;
             }
-
         }
     };
 
@@ -351,5 +290,19 @@ public class SubscriberActivity extends AppCompatActivity {
         super.onDestroy();
         stopSOS();
     }
+    private void loadRecentGasValues() {
+        int limit = 10;  // Définissez la limite souhaitée ici
+        ArrayList<Double> recentGasValues = new DatabaseHelperGas(this).getRecentGasValues(limit);
+
+        // Ajouter les valeurs récentes au graphique
+        for (Double gasValue : recentGasValues) {
+            updateChart(gasValue);
+        }
+        // Utilisez les valeurs récupérées comme nécessaire
+        // Par exemple, vous pourriez les afficher dans un TextView ou les ajouter à un graphique.
+    }
+
+
+
 
 }
