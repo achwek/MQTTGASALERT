@@ -42,6 +42,8 @@ public class ListSubscriberActivity extends AppCompatActivity {
                     // Supprimez l'élément de la liste
                     subscribers.remove(position);
                     adapter.notifyItemRemoved(position);
+                    adapter.notifyDataSetChanged();
+
                 } else {
                     // Journalisez une erreur ou affichez un message indiquant la position invalide
                     Log.e("ListSubscriberActivity", "Position invalide : " + position);

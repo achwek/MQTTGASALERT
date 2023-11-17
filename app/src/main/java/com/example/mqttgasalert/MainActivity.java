@@ -10,6 +10,8 @@ import android.widget.EditText;
 import android.widget.Toast;
 import android.widget.ListView;
 
+
+
 public class MainActivity extends AppCompatActivity {
     private DatabaseHelper dbHelper;
     private ListView subscribersListView;
@@ -42,6 +44,7 @@ public class MainActivity extends AppCompatActivity {
         saveButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+
                 // Vérification si tous les champs sont remplis
                 if (validateInputs()) {
                     // Récupérer les valeurs des champs
@@ -59,6 +62,8 @@ public class MainActivity extends AppCompatActivity {
                         } catch (NumberFormatException e) {
                             e.printStackTrace();
                             // Gérer l'erreur de conversion ici si nécessaire
+                            Toast.makeText(MainActivity.this, "Erreur de conversion du port: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                            return;
                         }
                     }
 
@@ -85,6 +90,8 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+
+
 
         // Fin ajouter à la base de données
 

@@ -1,7 +1,7 @@
 package com.example.mqttgasalert;
 
 public class Subscriber {
-    private String subscriberId;
+    private int subscriberId;
     private String nameConnection;
     private String adresseBroker;
     private int port;
@@ -9,7 +9,7 @@ public class Subscriber {
     private int seuil;
 
     // Constructeur de la classe
-    public Subscriber(String subscriberId, String nameConnection, String adresseBroker,
+    public Subscriber(int subscriberId, String nameConnection, String adresseBroker,
                       int port, String topic, int seuil) {
         this.subscriberId = subscriberId;
         this.nameConnection = nameConnection;
@@ -52,7 +52,7 @@ public class Subscriber {
         return seuil;
     }
     //Méthode pour récupérer id
-    public String getSubscriberId() {
+    public int getSubscriberId() {
         return subscriberId;
     }
 }

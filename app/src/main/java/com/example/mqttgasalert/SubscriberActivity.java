@@ -1,42 +1,51 @@
 package com.example.mqttgasalert;
 
 
-
-import androidx.appcompat.app.AppCompatActivity;
+import android.Manifest;
+import androidx.core.app.ActivityCompat;
+import android.content.Intent;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.hardware.camera2.CameraAccessException;
-import android.hardware.camera2.CameraManager;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.os.Vibrator;
 import android.view.View;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.ListView;
-import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
-import org.eclipse.paho.client.mqttv3.*;
-import android.content.Intent;
+import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CameraAccessException;  // Add this line for CameraAccessException
+import androidx.core.content.ContextCompat;
+import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
+import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.MqttMessage;
 import com.github.mikephil.charting.charts.LineChart;
-import com.github.mikephil.charting.data.Entry;
-import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.data.LineData;
-import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import com.github.mikephil.charting.components.YAxis;
-import android.graphics.Color;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import android.graphics.Color;
+import android.app.PendingIntent;
+import android.app.AlarmManager;
+import android.util.Log;
+
 
 public class SubscriberActivity extends AppCompatActivity {
     private LineChart mChart;
@@ -45,7 +54,10 @@ public class SubscriberActivity extends AppCompatActivity {
     private CameraManager cameraManager;
     private String cameraId;
     private Handler sosHandler = new Handler(Looper.getMainLooper());
+    private Handler alarmHandler = new Handler(Looper.getMainLooper()); // Ajoutez cette ligne pour déclarer la variable alarmHandler
+
     private int sosIndex = 0;
+    private static final long ALARM_DURATION = 1000; // 5 minutes
     private static final long SOS_DELAY = 100;
 
     private String brokerAddress, brokerPort, gasTopic, threshold;
@@ -55,6 +67,13 @@ public class SubscriberActivity extends AppCompatActivity {
 
     private MqttClient mqttClient;
     private double thresholdValue = 0.0;
+    private static final int MAX_LIST_SIZE = 15;
+    // Déclarez MY_PERMISSIONS_REQUEST_VIBRATE en tant que variable de classe
+    private static final int MY_PERMISSIONS_REQUEST_VIBRATE = 123;  // Vous pouvez choisir n'importe quel nombre entier
+    private AlarmManager alarmManager; // Ajoutez cette ligne pour déclarer la variable alarmManager
+    private PendingIntent alarmPendingIntent; // Ajoutez cette ligne pour déclarer la variable alarmPendingIntent
+    private PendingIntent pendingIntent; // Déclarez la variable ici
+
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -76,6 +95,9 @@ public class SubscriberActivity extends AppCompatActivity {
         dataSet = new LineDataSet(new ArrayList<>(), "Gas Values");
         LineData lineData = new LineData(dataSet);
         mChart.setData(lineData);
+// Créer une intention pour l'alarme
+        Intent alarmIntent = new Intent(this, AlarmReceiver.class);
+        pendingIntent = PendingIntent.getBroadcast(this, 0, alarmIntent, 0);
 
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)) {
             Toast.makeText(this, "La lampe de poche n'est pas disponible sur ce dispositif", Toast.LENGTH_SHORT).show();
@@ -90,32 +112,25 @@ public class SubscriberActivity extends AppCompatActivity {
             e.printStackTrace();
             return;
         }
-
+// Demander la permission de vibration si elle n'est pas accordée
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.VIBRATE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.VIBRATE}, MY_PERMISSIONS_REQUEST_VIBRATE);
+        }
         String thresholdStr = threshold.toString();
         if (!thresholdStr.isEmpty()) {
             thresholdValue = Double.parseDouble(thresholdStr);
         }
-        try {
 
-            connectToMQTTBroker();
-
-        } catch (MqttException e) {
-            e.printStackTrace();
-            Toast.makeText(SubscriberActivity.this, "Failed to connect to the MQTT broker", Toast.LENGTH_SHORT).show();
-        }
-
-
-            loadRecentGasValues();
-
-
-
-
+        connectToMQTTBroker();
+        // Call the method to update UI with recent gas values
+        updateUIWithRecentGasValues();
     }
 
-    private void connectToMQTTBroker() throws MqttException {
+    private void connectToMQTTBroker() {
         String brokerAd = brokerAddress.toString();
         String brokerP = brokerPort.toString();
-        final String broker = "tcp://" + brokerAd + ":" + brokerP;
+        final String broker = "tcp://" + brokerAd.trim() + ":" + brokerP.trim();
+
         final String clientId = "AndroidCl" + System.currentTimeMillis();
 
         try {
@@ -125,8 +140,6 @@ public class SubscriberActivity extends AppCompatActivity {
             options.setCleanSession(true);
 
             mqttClient.connect(options);
-            // Chargez les 10 dernières valeurs de la base de données et mettez à jour le graphique
-            loadRecentGasValues();
 
             mqttClient.setCallback(new MqttCallback() {
                 @Override
@@ -157,7 +170,6 @@ public class SubscriberActivity extends AppCompatActivity {
 
         } catch (MqttException e) {
             e.printStackTrace();
-            throw e; // throw the exception to be caught by the calling method
         }
     }
 
@@ -176,12 +188,22 @@ public class SubscriberActivity extends AppCompatActivity {
 
         // Add the gas value and date to the list
         String gasValueWithDate = value + " (" + formattedDateTime + ")";
-        gasValuesList.add(0, gasValueWithDate);  // Ajoutez le nouvel élément en haut de la liste
+        // Add the gas value at the beginning of the list
+        gasValuesList.add(0, gasValueWithDate);
+        // Create a Gas object and insert it into the database
+        Gas gas = new Gas(value, formattedDateTime);
+        DatabaseHelperGas dbHelper = new DatabaseHelperGas(this);
+        dbHelper.insertGasValue(gas);
 
+
+        // Limit the list size to MAX_LIST_SIZE
+        if (gasValuesList.size() > MAX_LIST_SIZE) {
+            gasValuesList.remove(gasValuesList.size() - 1); // Remove the oldest element
+
+        }
         // Notify the adapter that the data set has changed
         gasValuesAdapter.notifyDataSetChanged();
     }
-
     private void updateChart(double gasValue) {
         LineData data = mChart.getData();
 
@@ -201,8 +223,7 @@ public class SubscriberActivity extends AppCompatActivity {
     }
 
     private LineDataSet createSet() {
-        LineDataSet set = new LineDataSet(new ArrayList<>(), "Gas Values");
-
+        LineDataSet set = new LineDataSet(null, "Gas Values");
         set.setAxisDependency(YAxis.AxisDependency.LEFT);
         set.setColor(Color.RED);
         set.setCircleColor(Color.RED);
@@ -210,22 +231,10 @@ public class SubscriberActivity extends AppCompatActivity {
         set.setCircleRadius(3f);
         set.setValueTextSize(10f);
         set.setDrawValues(false);
-
         return set;
     }
 
 
-    private void handleGasExceedingThreshold(final double gasValue) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                if (gasValue > thresholdValue) {
-                    vibrateDevice();
-                    toggleSOS();
-                }
-            }
-        });
-    }
 
     private void vibrateDevice() {
         Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
@@ -245,10 +254,7 @@ public class SubscriberActivity extends AppCompatActivity {
         sosHandler.post(sosRunnable);
     }
 
-    private void stopSOS() {
-        sosHandler.removeCallbacks(sosRunnable);
-        turnOffFlashlight();
-    }
+
 
     private void turnOnFlashlight() {
         try {
@@ -285,24 +291,132 @@ public class SubscriberActivity extends AppCompatActivity {
     };
 
 
+
+    private void updateUIWithRecentGasValues() {
+        DatabaseHelperGas dbHelper = new DatabaseHelperGas(this);
+        List<Gas> recentGasValues = dbHelper.getRecentGasValues();
+
+        // Update ListView
+        for (Gas gas : recentGasValues) {
+            String gasValueWithDate = gas.getValue() + " (" + gas.getDateTime() + ")";
+            gasValuesList.add(0, gasValueWithDate);
+        }
+        gasValuesAdapter.notifyDataSetChanged();
+
+        // Update Chart
+        for (Gas gas : recentGasValues) {
+            updateChart(Double.parseDouble(gas.getValue()));
+        }
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
         stopSOS();
     }
-    private void loadRecentGasValues() {
-        int limit = 10;  // Définissez la limite souhaitée ici
-        ArrayList<Double> recentGasValues = new DatabaseHelperGas(this).getRecentGasValues(limit);
 
-        // Ajouter les valeurs récentes au graphique
-        for (Double gasValue : recentGasValues) {
-            updateChart(gasValue);
+
+
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case MY_PERMISSIONS_REQUEST_VIBRATE: {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // Permission accordée, vous pouvez maintenant utiliser la vibration
+                } else {
+                    // Permission refusée, gestion en conséquence
+                    Toast.makeText(this, "Permission de vibration refusée", Toast.LENGTH_SHORT).show();
+                }
+                return;
+            }
+            // autres cas de permission ici si nécessaire
         }
-        // Utilisez les valeurs récupérées comme nécessaire
-        // Par exemple, vous pourriez les afficher dans un TextView ou les ajouter à un graphique.
+    }
+
+    private void handleGasExceedingThreshold(final double gasValue) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (gasValue > thresholdValue) {
+                    // Lire les préférences partagées
+                    SharedPreferences sharedPreferences = getSharedPreferences("MyPrefs", MODE_PRIVATE);
+
+                    // Vérifier si la vibration est activée
+                    boolean vibrationEnabled = sharedPreferences.getBoolean("vibration_enabled", true);
+                    if (vibrationEnabled) {
+                        vibrateDevice();
+                    }
+
+                    // Vérifier si le SOS est activé
+                    boolean sosEnabled = sharedPreferences.getBoolean("sos_enabled", true);
+                    if (sosEnabled) {
+                        toggleSOS();
+
+                        // Récupérer la durée du SOS depuis les préférences partagées
+                        long sosDuration = sharedPreferences.getLong("sos_duration", 300);
+                        scheduleAlarm(); // Démarrez l'alarme
+                        scheduleAlarmCancellation(sosDuration * 1000); // Convertissez la durée en millisecondes
+                    }
+                }
+            }
+        });
     }
 
 
+    private void scheduleAlarm() {
+        // Vérifiez si la permission VIBRATE est accordée
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.VIBRATE) == PackageManager.PERMISSION_GRANTED) {
+
+            // Obtenez l'instance de AlarmManager
+            alarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
+
+            // Définissez l'heure à laquelle déclencher l'alarme (par exemple, immédiatement)
+            long triggerTime = SystemClock.elapsedRealtime();
+
+            // Programmez l'alarme
+            if (alarmManager != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerTime, pendingIntent);
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                    alarmManager.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerTime, pendingIntent);
+                } else {
+                    alarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerTime, pendingIntent);
+                }
+            }
+        } else {
+            // La permission de vibration n'est pas accordée, gérer en conséquence
+            Toast.makeText(this, "Permission de vibration manquante pour l'alarme", Toast.LENGTH_SHORT).show();
+        }
+    }
+    private void stopSOS() {
+        Log.d("SubscriberActivity", "Stopping SOS");
+        sosHandler.removeCallbacks(sosRunnable);
+        turnOffFlashlight();
+
+        if (alarmPendingIntent != null) {
+            Log.d("SubscriberActivity", "Canceling alarm");
+            cancelAlarm(); // Arrêter l'alarme lorsque vous arrêtez le SOS
+        }
+    }
+
+
+    private void scheduleAlarmCancellation(long delayMillis) {
+        Log.d("SubscriberActivity", "Scheduling alarm cancellation");
+        // Planifiez l'annulation de l'alarme après la durée spécifiée
+        alarmHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                cancelAlarm();
+            }
+        }, delayMillis);
+    }
+    private void cancelAlarm() {
+        Log.d("SubscriberActivity", "Canceling the alarm");
+        if (alarmManager != null && alarmPendingIntent != null) {
+            alarmManager.cancel(alarmPendingIntent);
+        }
+    }
 
 
 }

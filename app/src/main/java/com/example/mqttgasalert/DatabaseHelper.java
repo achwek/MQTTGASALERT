@@ -11,7 +11,7 @@ import java.util.ArrayList;
 
 public class DatabaseHelper extends SQLiteOpenHelper {
     // Database information
-    private static final String DATABASE_NAME = "myappdatabase";
+    private static final String DATABASE_NAME = "MQTTDB";
     private static final int DATABASE_VERSION = 1;
 
     // Table information
@@ -35,7 +35,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 COLUMN_Connection_Name + " TEXT, " +
                 COLUMN_ADRESS_B + " TEXT, " +
-                COLUMN_PORT + " INTEGER, " + // Change TEXT to INTEGER for COLUMN_PORT
+                COLUMN_PORT + " INTEGER, " +
                 COLUMN_TOPIC + " TEXT, " +
                 COLUMN_SEUIL + " INTEGER)";
         db.execSQL(createTableQuery);
@@ -49,19 +49,31 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     // Insert a new configuration into the database
 // Insert a new configuration into the database
+    // Insert a new subscriber into the database
+    // Insert a new subscriber into the database
     public long insertSubscriber(String connectionName, String adressB, int port, String topic, String seuil) {
         long result = -1; // Initialize result to indicate failure
-        try (SQLiteDatabase db = this.getWritableDatabase()) {
+        SQLiteDatabase db = this.getWritableDatabase();
+
+        try {
             ContentValues values = new ContentValues();
+            // Remove the following line since COLUMN_ID is auto-incremented
+            // values.put(COLUMN_ID, subscriberId);
             values.put(COLUMN_Connection_Name, connectionName);
             values.put(COLUMN_ADRESS_B, adressB);
             values.put(COLUMN_PORT, port);
             values.put(COLUMN_TOPIC, topic);
             values.put(COLUMN_SEUIL, seuil);
+
             result = db.insert(TABLE_NAME, null, values);
+
+            Log.d("DatabaseHelper", "Inserted subscriber with ID: " + result);
         } catch (Exception e) {
-            Log.e("DatabaseHelper", "Error inserting subscriber: " + e.getMessage());
+            Log.e("DatabaseHelper", "Error inserting subscriber: " + e.getMessage(), e);
+        } finally {
+            db.close();
         }
+
         return result;
     }
 
@@ -74,6 +86,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
             if (cursor.moveToFirst()) {
                 do {
+                    int id= cursor.getInt(cursor.getColumnIndex(COLUMN_ID));
                     String connectionName = cursor.getString(cursor.getColumnIndex(COLUMN_Connection_Name));
                     String adresseBroker = cursor.getString(cursor.getColumnIndex(COLUMN_ADRESS_B));
                     int port = cursor.getInt(cursor.getColumnIndex(COLUMN_PORT));
@@ -81,7 +94,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     int seuil = cursor.getInt(cursor.getColumnIndex(COLUMN_SEUIL));
 
                     // Create a Subscriber object and add it to the list
-                    Subscriber subscriber = new Subscriber(connectionName, adresseBroker, port, topic, seuil);
+                    Subscriber subscriber = new Subscriber(id,connectionName, adresseBroker, port, topic, seuil);
                     subscriberList.add(subscriber);
                 } while (cursor.moveToNext());
             }
@@ -98,10 +111,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
         }
     }*/
-    public void deleteSubscriber(String subscriberId) {
+    public void deleteSubscriber(int subscriberId) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
-            int deletedRows = db.delete("subscribers", "id = ?", new String[]{String.valueOf(subscriberId)});
+            int deletedRows = db.delete(TABLE_NAME, COLUMN_ID + " = ?", new String[]{String.valueOf(subscriberId)});
             Log.d("DatabaseHelper", "Number of rows deleted: " + deletedRows);
         } catch (Exception e) {
             Log.e("DatabaseHelper", "Error deleting subscriber: " + e.getMessage());
@@ -109,6 +122,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             db.close();
         }
     }
+
 
 
 

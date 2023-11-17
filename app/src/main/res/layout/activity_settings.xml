@@ -2,18 +2,64 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/settings_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".SettingsActivity">
 
+    <!-- Titre de la page de paramètres -->
     <TextView
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="76dp"
         android:text="Settings"
         android:textColor="@color/lavender"
-        android:layout_centerInParent="true"
-        android:textSize="36sp" />
+        android:textSize="36sp"
+        android:textAlignment="center"
+        android:id="@+id/titre"/>
 
+    <!-- Option pour activer/désactiver l'alarme -->
+    <Switch
+        android:id="@+id/switchAlarm"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/titre"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="50dp"
+        android:text="Alarm"
+        android:textAlignment="center"/>
+
+    <!-- Option pour activer/désactiver la vibration -->
+    <Switch
+        android:id="@+id/switchVibration"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/switchAlarm"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="20dp"
+        android:text="Vibration"
+        android:textAlignment="center"/>
+
+    <!-- Option pour activer/désactiver la lumière -->
+    <Switch
+        android:id="@+id/switchLight"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/switchVibration"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginTop="20dp"
+        android:text="Light"
+        android:textAlignment="center"/>
+
+
+
+    <!-- Bottom Navigation -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottomNavigation"
         android:layout_width="match_parent"
